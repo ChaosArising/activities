@@ -26,8 +26,24 @@ const ACTIVITIES: {
     name: "Fishington.io",
   },
   chess: {
-    id: "832012586023256104",
-    name: "CG 2 Dev",
+    id: "832012774040141894",
+    name: "Chess in the Park",
+  },
+  watchTogether: {
+    id: "880218394199220334",
+    name: "Watch Together",
+  },
+  doodleCrew: {
+    id: "878067389634314250",
+    name: "Doodle Crew",
+  },
+  letterTile: {
+    id: "879863686565621790",
+    name: "Letter Tile",
+  },
+  wordSnacks: {
+    id: "879863976006127627",
+    name: "Word Snacks",
   },
 };
 
