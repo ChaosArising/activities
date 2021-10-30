@@ -1,4 +1,4 @@
-import * as slash from "https://raw.githubusercontent.com/harmonyland/harmony/main/deploy.ts";
+import * as slash from "https://code.harmony.rocks/v2.0.0/deploy";
 
 // Pick up TOKEN and PUBLIC_KEY from ENV.
 slash.init({ env: true });
@@ -47,33 +47,41 @@ const ACTIVITIES: {
   },
 };
 
-// Create Slash Commands if not present
-slash.commands.all().then((e) => {
-  if (e.size !== 2) {
-    slash.commands.bulkEdit([
+const commands = [
+   {
+     name: "activity",
+     description: "Start an Activity in a Voice Channel.",
+     options: [
+      {
+        name: "channel",
+        type: "CHANNEL",
+        description: "Voice Channel to start activity in.",
+        required: true,
+      },
       {
         name: "activity",
-        description: "Start an Activity in a Voice Channel.",
-        options: [
-          {
-            name: "channel",
-            type: slash.SlashCommandOptionType.CHANNEL,
-            description: "Voice Channel to start activity in.",
-            required: true,
-          },
-          {
-            name: "activity",
-            type: slash.SlashCommandOptionType.STRING,
-            description: "Activity to start.",
-            required: true,
-            choices: Object.entries(ACTIVITIES).map((e) => ({
-              name: e[1].name,
-              value: e[0],
-            })),
-          },
-        ],
+        type: "STRING",
+        description: "Activity to start.",
+        required: true,
+        choices: Object.entries(ACTIVITIES).map((e) => ({
+          name: e[1].name,
+          value: e[0],
+        })),
       },
-    ]);
+    ],
+  },
+];
+
+// Create Slash Commands if not present
+slash.commands.all().then((e) => {
+  let cmd;
+  if (
+    e.size !== commands.length || 
+    !(cmd = e.find(e => e.name === "activity")) 
+    || cmd?.options[1]?.choices?.length !== Object.keys(ACTIVITIES)
+    || cmd.options[1].choices.some(e => ACTIVITIES[e.value] !== e.name)
+  ) {
+    slash.commands.bulkEdit(commands);
   }
 });
 
@@ -81,16 +89,27 @@ slash.handle("activity", (d) => {
   if (!d.guild) return;
   const channel = d.option<slash.InteractionChannel>("channel");
   const activity = ACTIVITIES[d.option<string>("activity")];
-  if (!channel || !activity) {
-    return d.reply("Invalid interaction.", { ephemeral: true });
-  }
+  if (!channel || !activity) return;
+  
   if (channel.type !== slash.ChannelTypes.GUILD_VOICE) {
-    return d.reply("Activities can only be started in Voice Channels.", {
+    return d.reply("Activities can only be started in Voice Channels!", {
       ephemeral: true,
     });
   }
 
-  slash.client.rest.api.channels[channel.id].invites
+  // POST /channels/{channel.id}/invites
+  // with target_type: 2,
+  // and target_appliation_id: app_id of activity
+  
+  // Wanna curl?
+  /* 
+     curl -X POST \
+       -H "Authorization: Bot $TOKEN" \
+       -H "Content-Type: application/json" \
+       https://discord.com/api/v9/channels/$CHANNEL_ID/invites \
+       -d "{ \"max_age\": 604800, \"max_uses\": 0, \"target_type\": 2, \"target_application_id\": \"$APP_ID\", \"temporary\": false }"
+  */
+  return slash.client.rest.api.channels[channel.id].invites
     .post({
       max_age: 604800,
       max_uses: 0,
@@ -99,16 +118,17 @@ slash.handle("activity", (d) => {
       temporary: false,
     })
     .then((inv) => {
-      d.reply(
+      return d.reply(
         `[Click here to start ${activity.name} in ${channel.name}.](<https://discord.gg/${inv.code}>)`
       );
     })
     .catch((e) => {
-      console.log("Failed", e);
-      d.reply("Failed to start Activity.", { ephemeral: true });
+      console.error("Starting Activity Failed", e);
+      return d.reply("Failed to start Activity.", { ephemeral: true });
     });
 });
+
 // Handle for any other commands received.
 slash.handle("*", (d) => d.reply("Unhandled Command", { ephemeral: true }));
 // Log all errors.
-slash.client.on("interactionError", console.log);
+slash.client.on("interactionError", console.error);
